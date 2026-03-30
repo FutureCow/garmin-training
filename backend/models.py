@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, DateTime, JSON, Boolean, Float, ForeignKey,
 )
@@ -14,7 +14,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     garmin_credentials_encrypted = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     preferences = relationship(
         "UserPreferences", back_populates="user",
@@ -49,7 +49,7 @@ class TrainingSchema(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     schema_type = Column(String, nullable=False)   # "fixed" | "rolling"
     schema_data = Column(JSON, nullable=False)
     is_active = Column(Boolean, default=True)
