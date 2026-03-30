@@ -1,6 +1,6 @@
 # Deployment op Alpine Linux
 
-Alpine Linux gebruikt `apk` als pakketbeheerder en `OpenRC` als init-systeem (geen systemd). Dit document beschrijft de volledige installatie op Alpine Linux 3.19+.
+Alpine Linux gebruikt `apk` als pakketbeheerder en `OpenRC` als init-systeem (geen systemd). Dit document beschrijft de volledige installatie op Alpine Linux 3.21+.
 
 > **Verschillen met standaard Linux:**
 > - `apk` in plaats van `apt`/`yum`
@@ -19,7 +19,7 @@ apk update && apk upgrade
 apk add \
   python3 python3-dev py3-pip \
   nodejs npm \
-  postgresql15 postgresql15-client \
+  postgresql17 postgresql17-client \
   nginx \
   certbot certbot-nginx \
   git curl bash \

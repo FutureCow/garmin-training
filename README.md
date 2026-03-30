@@ -27,7 +27,7 @@ Een webapplicatie voor hardlopers die via Garmin Connect een gepersonaliseerd tr
 | Laag | Technologie |
 |---|---|
 | Backend | Python 3.11+, FastAPI, SQLAlchemy (async), asyncpg |
-| Database | PostgreSQL 15 |
+| Database | PostgreSQL 17 |
 | AI | Anthropic Claude (claude-opus-4-6) via MCP |
 | Garmin | garmin-connect-mcp (Node.js 20+) |
 | Frontend | Vanilla JS (ES modules), HTML, CSS |
@@ -37,7 +37,7 @@ Een webapplicatie voor hardlopers die via Garmin Connect een gepersonaliseerd tr
 
 - Python 3.11+
 - Node.js 20+
-- PostgreSQL 15
+- PostgreSQL 17
 - Nginx
 - Certbot (Let's Encrypt)
 - Anthropic API key
