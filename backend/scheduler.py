@@ -1,6 +1,6 @@
 import json
 import re
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 
 from .auth import decrypt_garmin_credentials
 from .config import settings
@@ -37,10 +37,17 @@ async def generate_training_schedule(
             }
         ]
 
-        client = Anthropic(api_key=settings.anthropic_api_key)
+        client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+
+        MAX_ITERATIONS = 20
+        iteration = 0
 
         while True:
-            response = client.messages.create(
+            iteration += 1
+            if iteration > MAX_ITERATIONS:
+                raise ValueError(f"Claude did not finish within {MAX_ITERATIONS} tool-use iterations")
+
+            response = await client.messages.create(
                 model="claude-opus-4-6",
                 max_tokens=8192,
                 system=system_prompt,
@@ -48,11 +55,14 @@ async def generate_training_schedule(
                 messages=messages,
             )
 
+            if response.stop_reason == "max_tokens":
+                raise ValueError("Claude exceeded max_tokens before completing the training schedule")
+
             if response.stop_reason == "end_turn":
                 for block in response.content:
                     if hasattr(block, "text"):
                         return _extract_json(block.text)
-                break
+                raise ValueError("Claude returned end_turn but no text block was found")
 
             # Append assistant turn
             messages.append({"role": "assistant", "content": response.content})
@@ -75,9 +85,9 @@ async def generate_training_schedule(
                         }
                     )
 
+            if not tool_results:
+                raise ValueError("Claude stopped with tool_use but emitted no tool_use blocks")
             messages.append({"role": "user", "content": tool_results})
-
-    return {}
 
 
 def _build_system_prompt(preferences: dict) -> str:
@@ -129,7 +139,10 @@ Toegestane trainingstypes: rust, duurloop, interval, tempo, lange_duur, herstel
 
 
 def _extract_json(text: str) -> dict:
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        return json.loads(match.group())
-    return json.loads(text)
+    try:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Claude response did not contain valid JSON: {e}") from e
