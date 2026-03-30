@@ -1,3 +1,4 @@
+import os
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
@@ -7,7 +8,10 @@ from sqlalchemy.orm import sessionmaker
 from backend.database import Base, get_db
 from backend.main import app
 
-TEST_DATABASE_URL = "postgresql+asyncpg://garmin:password@localhost/garmin_training_test"
+TEST_DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL",
+    "postgresql+asyncpg://garmin:password@localhost/garmin_training_test"
+)
 
 test_engine = create_async_engine(TEST_DATABASE_URL)
 TestSessionLocal = sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)

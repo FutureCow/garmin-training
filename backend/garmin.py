@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from mcp import ClientSession
 from mcp.client.stdio import stdio_client, StdioServerParameters
@@ -19,9 +20,9 @@ async def garmin_mcp_session(garmin_username: str, garmin_password: str):
         command="node",
         args=[settings.garmin_mcp_path],
         env={
+            **os.environ,
             "GARMIN_USERNAME": garmin_username,
             "GARMIN_PASSWORD": garmin_password,
-            "PATH": "/usr/local/bin:/usr/bin:/bin",
         },
     )
     async with stdio_client(server_params) as (read, write):
