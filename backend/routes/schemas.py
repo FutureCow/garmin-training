@@ -46,7 +46,8 @@ async def generate_schema(
     # Deactivate previous active schemas
     await db.execute(
         update(TrainingSchema)
-        .where(TrainingSchema.user_id == current_user.id, TrainingSchema.is_active == True)
+        .where(TrainingSchema.user_id == current_user.id, TrainingSchema.is_active.is_(True))
+        .execution_options(synchronize_session="fetch")
         .values(is_active=False)
     )
 
@@ -84,7 +85,7 @@ async def get_active_schema(
     result = await db.execute(
         select(TrainingSchema).where(
             TrainingSchema.user_id == current_user.id,
-            TrainingSchema.is_active == True,
+            TrainingSchema.is_active.is_(True),
         )
     )
     schema = result.scalar_one_or_none()
