@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instellingen — Garmin Training</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="/dashboard.html">🏃 Garmin Training</a>
+      <ul class="nav-links">
+        <li><a href="/dashboard.html">Dashboard</a></li>
+        <li><a href="/history.html">Historie</a></li>
+        <li><a href="/settings.html">Instellingen</a></li>
+        <li><a href="#" id="logout">Uitloggen</a></li>
+      </ul>
+    </div>
+  </nav>
+  <div class="container page">
+    <h1 style="margin-bottom:1.5rem;">Instellingen</h1>
+    <div id="alert" class="alert" style="display:none;"></div>
+
+    <div class="card">
+      <h2>Garmin Connect</h2>
+      <p style="margin-bottom:1rem;font-size:.9rem;color:var(--gray-600);">
+        Status: <span id="garmin-status"><span class="spinner"></span></span>
+      </p>
+      <div class="form-group">
+        <label>Garmin gebruikersnaam (e-mail)</label>
+        <input type="email" id="garmin-username" />
+      </div>
+      <div class="form-group">
+        <label>Garmin wachtwoord</label>
+        <input type="password" id="garmin-password" />
+      </div>
+      <button class="btn btn-primary" id="save-garmin">Opslaan</button>
+      <button class="btn btn-danger" id="remove-garmin" style="margin-left:.5rem;display:none;">Verwijderen</button>
+    </div>
+
+    <div class="card">
+      <h2>Trainingsvoorkeuren</h2>
+      <div class="form-group">
+        <label>Trainingsdagen</label>
+        <div class="day-checkboxes" id="day-checkboxes"></div>
+      </div>
+      <div class="form-group">
+        <label>Dag lange duurloop</label>
+        <select id="long-run-day"></select>
+      </div>
+      <div class="form-group">
+        <label>Doelafstand</label>
+        <select id="goal-distance">
+          <option value="5K">5 km</option>
+          <option value="10K">10 km</option>
+          <option value="halve_marathon">Halve marathon</option>
+          <option value="marathon">Marathon</option>
+          <option value="custom">Overig</option>
+        </select>
+      </div>
+      <div class="form-group" id="custom-distance-group" style="display:none;">
+        <label>Afstand (km)</label>
+        <input type="number" id="goal-distance-km" min="1" max="200" />
+      </div>
+      <div class="form-group">
+        <label>Doeltempo (min/km, bijv. 5:30) — optioneel</label>
+        <input type="text" id="goal-pace" placeholder="5:30" />
+      </div>
+      <div class="form-group">
+        <label>Doeltijd (uu:mm:ss, bijv. 1:45:00) — optioneel</label>
+        <input type="text" id="goal-time" placeholder="1:45:00" />
+      </div>
+      <div class="form-group">
+        <label>Schematype</label>
+        <select id="schema-type">
+          <option value="fixed">Vaste periode</option>
+          <option value="rolling">Rolling (wekelijks bijgewerkt)</option>
+        </select>
+      </div>
+      <div class="form-group" id="weeks-group">
+        <label>Aantal weken</label>
+        <input type="number" id="schema-weeks" min="4" max="52" value="12" />
+      </div>
+      <div class="form-group" id="startdate-group">
+        <label>Startdatum</label>
+        <input type="date" id="start-date" />
+      </div>
+      <button class="btn btn-primary" id="save-prefs">Voorkeuren opslaan</button>
+    </div>
+  </div>
+  <script type="module" src="/js/settings.js"></script>
+</body>
+</html>
