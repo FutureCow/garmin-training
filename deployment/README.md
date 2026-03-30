@@ -44,9 +44,9 @@ cd /opt/garmin-connect-mcp
 npm install
 npm run build
 
-# Playwright Chromium installeren (vereist voor Garmin-login)
-npx playwright install chromium
-npx playwright install-deps chromium
+# Playwright Chromium installeren op een vaste locatie
+PLAYWRIGHT_BROWSERS_PATH=/opt/playwright npx playwright install chromium
+PLAYWRIGHT_BROWSERS_PATH=/opt/playwright npx playwright install-deps chromium
 ```
 
 ---
@@ -205,6 +205,7 @@ export DISPLAY=:99
 
 # Login uitvoeren — opent een browservenster
 HOME=/opt/garmin-training/garmin-home/<user_id> \
+  PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
   DISPLAY=:99 \
   node /opt/garmin-connect-mcp/dist/index.js login
 ```
@@ -223,7 +224,8 @@ chown -R garmin:garmin /opt/garmin-training/garmin-home/
 >
 > ```bash
 > # Lokaal (vervang <user_id>)
-> HOME=./garmin-home/<user_id> node /opt/garmin-connect-mcp/dist/index.js login
+> HOME=./garmin-home/<user_id> PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
+>   node /opt/garmin-connect-mcp/dist/index.js login
 >
 > # Kopieer naar server
 > scp -r garmin-home/<user_id> user@server:/opt/garmin-training/garmin-home/

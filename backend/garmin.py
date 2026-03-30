@@ -40,7 +40,11 @@ async def garmin_mcp_session(user_id: int):
     server_params = StdioServerParameters(
         command="node",
         args=[settings.garmin_mcp_path],
-        env={**os.environ, "HOME": user_home},
+        env={
+            **os.environ,
+            "HOME": user_home,
+            "PLAYWRIGHT_BROWSERS_PATH": settings.playwright_browsers_path,
+        },
     )
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
