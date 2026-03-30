@@ -1,0 +1,15 @@
+[Unit]
+Description=Garmin Training App
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=garmin
+WorkingDirectory=/opt/garmin-training
+EnvironmentFile=/opt/garmin-training/.env
+ExecStart=/opt/garmin-training/venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
