@@ -1,0 +1,15 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    database_url: str
+    jwt_secret: str
+    fernet_key: str
+    anthropic_api_key: str
+    garmin_mcp_path: str = "/opt/garmin-connect-mcp/dist/index.js"
+
+    class Config:
+        env_file = ".env"
+
+
+settings = Settings()
