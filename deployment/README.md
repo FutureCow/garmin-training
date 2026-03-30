@@ -3,10 +3,10 @@
 ## Vereisten op de Linux server
 
 - Python 3.11+
-- Node.js 20+ (voor garmin-connect-mcp subprocess)
-- PostgreSQL 15
+- PostgreSQL 17
 - Nginx
 - Certbot
+- Playwright Chromium (eenmalig, voor eerste Garmin-login per gebruiker)
 
 ## Stappen
 
@@ -17,19 +17,22 @@ scp -r garmin-training/ user@server:/opt/garmin-training
 # 2. Maak system user aan
 useradd --system --no-create-home garmin
 
-# 3. Installeer garmin-connect-mcp
-git clone https://github.com/etweisberg/garmin-connect-mcp /opt/garmin-connect-mcp
-cd /opt/garmin-connect-mcp && npm install && npm run build
-
-# 4. Python venv instellen
+# 3. Python venv instellen
 cd /opt/garmin-training
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
 
-# 5. Maak .env aan (kopieer van .env.example en vul in)
+# Playwright Chromium installeren
+venv/bin/playwright install chromium
+
+# 4. Maak .env aan (kopieer van .env.example en vul in)
 cp .env.example .env
 # Genereer Fernet key:
 # python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+
+# 5. Tokens-map aanmaken
+mkdir -p /opt/garmin-training/garmin-tokens
+chown -R garmin:garmin /opt/garmin-training/garmin-tokens
 
 # 6. Database aanmaken
 sudo -u postgres createuser garmin
@@ -59,3 +62,25 @@ certbot --nginx -d jouwdomein.nl
 systemctl status garmin-training
 curl -I https://jouwdomein.nl/index.html
 ```
+
+## Eerste Garmin-login per gebruiker
+
+pirate-garmin vereist een eenmalige browser-gebaseerde login per gebruiker om OAuth-tokens op te slaan.
+Na de eerste login werkt de app automatisch met de gecachete tokens.
+
+```bash
+# Voer uit als de garmin-serviceuser, na registratie van de gebruiker in de app
+# Vervang <user_id> door het database-ID (SELECT id FROM users WHERE email='...')
+su -s /bin/bash garmin -c \
+  "GARMIN_USERNAME=gebruiker@email.nl GARMIN_PASSWORD=wachtwoord \
+   /opt/garmin-training/venv/bin/pirate-garmin login \
+   --app-dir /opt/garmin-training/garmin-tokens/<user_id>"
+```
+
+> **Let op:** Playwright heeft een display nodig. Gebruik `Xvfb` op servers zonder scherm:
+> ```bash
+> apk add xvfb  # Alpine
+> # of: apt install xvfb  # Debian/Ubuntu
+> Xvfb :99 -screen 0 1280x720x24 &
+> export DISPLAY=:99
+> ```

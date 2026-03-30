@@ -18,7 +18,6 @@ apk update && apk upgrade
 
 apk add \
   python3 python3-dev py3-pip \
-  nodejs npm \
   postgresql17 postgresql17-client \
   nginx \
   certbot certbot-nginx \
@@ -28,6 +27,7 @@ apk add \
 ```
 
 > `gcc`, `musl-dev` en `build-base` zijn nodig om Python packages met C-extensies te compileren (bcrypt, cryptography, asyncpg).
+> Node.js is **niet** meer vereist — pirate-garmin is een pure Python library.
 
 ---
 
@@ -50,22 +50,7 @@ su - postgres -s /bin/sh -c "psql -c \"CREATE DATABASE garmin_training OWNER gar
 
 ---
 
-## 3. Node.js en garmin-connect-mcp installeren
-
-```bash
-# garmin-connect-mcp bouwen
-git clone https://github.com/etweisberg/garmin-connect-mcp /opt/garmin-connect-mcp
-cd /opt/garmin-connect-mcp
-npm install
-npm run build
-
-# Controleer
-ls /opt/garmin-connect-mcp/dist/index.js
-```
-
----
-
-## 4. Project installeren
+## 3. Project installeren
 
 ```bash
 # Project clonen
@@ -79,6 +64,10 @@ adduser -S -H -D garmin
 python3 -m venv venv
 venv/bin/pip install --upgrade pip
 venv/bin/pip install -r requirements.txt
+
+# Playwright Chromium installeren (vereist voor eerste Garmin-login)
+venv/bin/playwright install chromium
+venv/bin/playwright install-deps chromium
 ```
 
 ---
@@ -102,7 +91,7 @@ DATABASE_URL=postgresql+asyncpg://garmin:jouwwachtwoord@localhost/garmin_trainin
 JWT_SECRET=lang-willekeurig-geheim
 FERNET_KEY=<zie hieronder>
 ANTHROPIC_API_KEY=sk-ant-...
-GARMIN_MCP_PATH=/opt/garmin-connect-mcp/dist/index.js
+GARMIN_TOKENS_DIR=/opt/garmin-training/garmin-tokens
 ```
 
 Genereer een Fernet key:
@@ -117,6 +106,13 @@ Eigenaar instellen:
 ```bash
 chown -R garmin:garmin /opt/garmin-training
 chmod 600 /opt/garmin-training/.env
+```
+
+Maak de tokens-map aan en stel eigenaar in:
+
+```bash
+mkdir -p /opt/garmin-training/garmin-tokens
+chown -R garmin:garmin /opt/garmin-training/garmin-tokens
 ```
 
 ---
@@ -266,20 +262,27 @@ tail -f /var/log/messages | grep garmin
 
 ## Problemen oplossen
 
-**Fout: `node: not found` bij schema genereren**
+**Fout: `playwright._impl._errors.Error` of `Executable doesn't exist`**
+
+Playwright Chromium is niet geïnstalleerd:
 
 ```bash
-which node        # Controleer of node beschikbaar is
-node --version    # Moet 20+ zijn
+/opt/garmin-training/venv/bin/playwright install chromium
+/opt/garmin-training/venv/bin/playwright install-deps chromium
 ```
 
-Als node niet gevonden wordt als de `garmin`-user:
+**Fout: `pirate_garmin.auth.AuthenticationError` bij schema genereren**
+
+De Garmin sessie-tokens zijn verlopen of nog niet aangemaakt. Voer de eerste login uit als de `garmin`-user:
 
 ```bash
-# Controleer PATH in het init script
-cat /etc/init.d/garmin-training
-# Voeg toe aan env sectie: export PATH="/usr/local/bin:/usr/bin:/bin"
+su -s /bin/bash garmin -c \
+  "GARMIN_USERNAME=jouw@email.nl GARMIN_PASSWORD=jouwwachtwoord \
+   /opt/garmin-training/venv/bin/pirate-garmin login \
+   --app-dir /opt/garmin-training/garmin-tokens/<user_id>"
 ```
+
+Vervang `<user_id>` door het database-ID van de gebruiker (zie `SELECT id FROM users WHERE email='...'`).
 
 **Fout: `connection refused` op PostgreSQL**
 

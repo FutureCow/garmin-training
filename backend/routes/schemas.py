@@ -41,6 +41,7 @@ async def generate_schema(
     schema_data = await generate_training_schedule(
         current_user.garmin_credentials_encrypted,
         prefs_dict,
+        current_user.id,
     )
 
     # Deactivate previous active schemas

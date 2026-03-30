@@ -4,7 +4,7 @@ Een webapplicatie voor hardlopers die via Garmin Connect een gepersonaliseerd tr
 
 ## Wat doet de app?
 
-- Koppelt aan **Garmin Connect** via de [garmin-connect-mcp](https://github.com/etweisberg/garmin-connect-mcp) MCP-server
+- Koppelt aan **Garmin Connect** via [pirate-garmin](https://github.com/jeffton/pirate-garmin)
 - Analyseert je volledige trainingshistorie (activiteiten, VO2max, hartslag, hersteltijd, slaap)
 - Genereert een gepersonaliseerd trainingsschema via **Claude (claude-opus-4-6)**
 - Ondersteunt meerdere gebruikers, elk met eigen Garmin-account
@@ -29,19 +29,19 @@ Een webapplicatie voor hardlopers die via Garmin Connect een gepersonaliseerd tr
 | Backend | Python 3.11+, FastAPI, SQLAlchemy (async), asyncpg |
 | Database | PostgreSQL 17 |
 | AI | Anthropic Claude (claude-opus-4-6) via MCP |
-| Garmin | garmin-connect-mcp (Node.js 20+) |
+| Garmin | pirate-garmin (Python, Playwright) |
 | Frontend | Vanilla JS (ES modules), HTML, CSS |
 | Deployment | Nginx, systemd, Let's Encrypt |
 
 ## Vereisten
 
 - Python 3.11+
-- Node.js 20+
 - PostgreSQL 17
 - Nginx
 - Certbot (Let's Encrypt)
 - Anthropic API key
 - Garmin Connect account
+- Playwright Chromium (eenmalig, voor eerste Garmin-login)
 
 ## Installatie
 
@@ -52,20 +52,15 @@ git clone https://github.com/FutureCow/garmin-training.git /opt/garmin-training
 cd /opt/garmin-training
 ```
 
-### 2. garmin-connect-mcp installeren
-
-```bash
-git clone https://github.com/etweisberg/garmin-connect-mcp /opt/garmin-connect-mcp
-cd /opt/garmin-connect-mcp
-npm install && npm run build
-```
-
-### 3. Python omgeving
+### 2. Python omgeving
 
 ```bash
 cd /opt/garmin-training
 python3 -m venv venv
 venv/bin/pip install -r requirements.txt
+
+# Playwright Chromium installeren (vereist voor eerste Garmin-login per gebruiker)
+venv/bin/playwright install chromium
 ```
 
 ### 4. Omgevingsvariabelen
@@ -82,7 +77,7 @@ DATABASE_URL=postgresql+asyncpg://garmin:jouwwachtwoord@localhost/garmin_trainin
 JWT_SECRET=lang-willekeurig-geheim
 FERNET_KEY=<genereer hieronder>
 ANTHROPIC_API_KEY=sk-ant-...
-GARMIN_MCP_PATH=/opt/garmin-connect-mcp/dist/index.js
+GARMIN_TOKENS_DIR=/opt/garmin-training/garmin-tokens
 ```
 
 Genereer een Fernet key:
