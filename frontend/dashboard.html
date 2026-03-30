@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Garmin Training</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="/dashboard.html">🏃 Garmin Training</a>
+      <ul class="nav-links">
+        <li><a href="/dashboard.html">Dashboard</a></li>
+        <li><a href="/history.html">Historie</a></li>
+        <li><a href="/settings.html">Instellingen</a></li>
+        <li><a href="#" id="logout">Uitloggen</a></li>
+      </ul>
+    </div>
+  </nav>
+  <div class="container page">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+      <h1>Dashboard</h1>
+      <button class="btn btn-primary" id="generate-btn">Nieuw schema genereren</button>
+    </div>
+    <div id="alert" class="alert" style="display:none;"></div>
+    <div id="generating" style="display:none;" class="card">
+      <span class="spinner"></span> Schema wordt gegenereerd door Claude... Dit kan 30-60 seconden duren.
+    </div>
+    <div id="schema-summary" class="card" style="display:none;">
+      <h2>Huidig schema <span id="schema-type-badge"></span></h2>
+      <p id="schema-summary-text" style="color:var(--gray-600);font-size:.9rem;margin-bottom:1rem;"></p>
+      <a href="/schema.html" class="btn btn-outline">Volledig schema bekijken →</a>
+    </div>
+    <div id="week-preview" style="display:none;" class="card">
+      <h2 id="week-title">Week 1</h2>
+      <div class="week-grid" id="week-grid"></div>
+    </div>
+    <div id="no-schema" class="card" style="display:none;">
+      <p>Je hebt nog geen schema. Klik op "Nieuw schema genereren" om te beginnen.</p>
+      <p style="margin-top:.5rem;font-size:.9rem;color:var(--gray-600);">
+        Zorg dat je <a href="/settings.html">Garmin-account gekoppeld</a> is en voorkeuren hebt ingesteld.
+      </p>
+    </div>
+  </div>
+  <script type="module" src="/js/dashboard.js"></script>
+</body>
+</html>
