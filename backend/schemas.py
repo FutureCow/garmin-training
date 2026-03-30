@@ -50,7 +50,8 @@ class PreferencesRequest(BaseModel):
 
 
 class PreferencesResponse(PreferencesRequest):
-    pass
+    class Config:
+        from_attributes = True
 
 
 # --- Training schemas ---

@@ -59,6 +59,7 @@ async def update_garmin_credentials(
     current_user.garmin_credentials_encrypted = encrypt_garmin_credentials(
         body.garmin_username, body.garmin_password
     )
+    db.add(current_user)
     await db.commit()
     return GarminStatusResponse(connected=True)
 
@@ -74,5 +75,6 @@ async def delete_garmin_credentials(
     db: AsyncSession = Depends(get_db),
 ):
     current_user.garmin_credentials_encrypted = None
+    db.add(current_user)
     await db.commit()
     return GarminStatusResponse(connected=False)
