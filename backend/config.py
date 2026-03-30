@@ -6,7 +6,8 @@ class Settings(BaseSettings):
     jwt_secret: str
     fernet_key: str
     anthropic_api_key: str
-    garmin_tokens_dir: str = "/opt/garmin-training/garmin-tokens"
+    garmin_home_dir: str = "/opt/garmin-training/garmin-home"
+    garmin_mcp_path: str = "/opt/garmin-connect-mcp/dist/index.js"
 
     class Config:
         env_file = ".env"

@@ -11,6 +11,7 @@ apt update && apt upgrade -y
 
 apt install -y \
   python3 python3-dev python3-pip python3-venv \
+  nodejs npm \
   postgresql postgresql-client \
   nginx \
   certbot python3-certbot-nginx \
@@ -20,27 +21,39 @@ apt install -y \
   xvfb
 ```
 
-> `xvfb` is nodig voor Playwright (headless browser) op servers zonder scherm.
+> `xvfb` is nodig voor de Garmin-login (headless browser) op servers zonder scherm.
 
 ---
 
 ## 2. PostgreSQL instellen
 
 ```bash
-# PostgreSQL starten en autostart inschakelen
 systemctl enable --now postgresql
 
-# Database en gebruiker aanmaken
 sudo -u postgres psql -c "CREATE USER garmin WITH PASSWORD 'jouwwachtwoord';"
 sudo -u postgres psql -c "CREATE DATABASE garmin_training OWNER garmin;"
 ```
 
 ---
 
-## 3. Project installeren
+## 3. garmin-connect-mcp installeren
 
 ```bash
-# Repository clonen
+git clone https://github.com/etweisberg/garmin-connect-mcp /opt/garmin-connect-mcp
+cd /opt/garmin-connect-mcp
+npm install
+npm run build
+
+# Playwright Chromium installeren (vereist voor Garmin-login)
+npx playwright install chromium
+npx playwright install-deps chromium
+```
+
+---
+
+## 4. Project installeren
+
+```bash
 git clone https://github.com/FutureCow/garmin-training.git /opt/garmin-training
 cd /opt/garmin-training
 
@@ -51,15 +64,11 @@ useradd --system --no-create-home garmin
 python3 -m venv venv
 venv/bin/pip install --upgrade pip
 venv/bin/pip install -r requirements.txt
-
-# Playwright Chromium installeren (vereist voor eerste Garmin-login)
-venv/bin/playwright install chromium
-venv/bin/playwright install-deps chromium
 ```
 
 ---
 
-## 4. Omgevingsvariabelen instellen
+## 5. Omgevingsvariabelen instellen
 
 ```bash
 cp .env.example .env
@@ -73,7 +82,8 @@ DATABASE_URL=postgresql+asyncpg://garmin:jouwwachtwoord@localhost/garmin_trainin
 JWT_SECRET=lang-willekeurig-geheim
 FERNET_KEY=<zie hieronder>
 ANTHROPIC_API_KEY=sk-ant-...
-GARMIN_TOKENS_DIR=/opt/garmin-training/garmin-tokens
+GARMIN_HOME_DIR=/opt/garmin-training/garmin-home
+GARMIN_MCP_PATH=/opt/garmin-connect-mcp/dist/index.js
 ```
 
 Genereer een Fernet key:
@@ -92,16 +102,16 @@ chmod 600 /opt/garmin-training/.env
 
 ---
 
-## 5. Tokens-map aanmaken
+## 6. Garmin-home map aanmaken
 
 ```bash
-mkdir -p /opt/garmin-training/garmin-tokens
-chown -R garmin:garmin /opt/garmin-training/garmin-tokens
+mkdir -p /opt/garmin-training/garmin-home
+chown -R garmin:garmin /opt/garmin-training/garmin-home
 ```
 
 ---
 
-## 6. Database migraties uitvoeren
+## 7. Database migraties uitvoeren
 
 ```bash
 cd /opt/garmin-training
@@ -110,7 +120,7 @@ venv/bin/alembic upgrade head
 
 ---
 
-## 7. Systemd service installeren
+## 8. Systemd service installeren
 
 ```bash
 cp /opt/garmin-training/deployment/systemd/garmin-training.service \
@@ -124,43 +134,38 @@ Controleer of de service draait:
 
 ```bash
 systemctl status garmin-training
-# Of bekijk de logs:
 journalctl -u garmin-training -f
 ```
 
 ---
 
-## 8. Nginx configureren
+## 9. Nginx configureren
 
 ```bash
-# Pas domeinnaam aan in het config-bestand
 cp /opt/garmin-training/deployment/nginx/garmin-training.conf \
    /etc/nginx/sites-available/garmin-training
 
 # Vervang 'jouwdomein.nl' door je echte domeinnaam (2x)
 nano /etc/nginx/sites-available/garmin-training
 
-# Activeren
 ln -s /etc/nginx/sites-available/garmin-training \
       /etc/nginx/sites-enabled/garmin-training
 
-# Verwijder de standaard Nginx config als die conflicteert
 rm -f /etc/nginx/sites-enabled/default
 
-# Testen en starten
 nginx -t
 systemctl enable --now nginx
 ```
 
 ---
 
-## 9. SSL certificaat via Let's Encrypt
+## 10. SSL certificaat via Let's Encrypt
 
 ```bash
 certbot --nginx -d jouwdomein.nl
 ```
 
-Certbot stelt automatische verlenging in via een systemd-timer. Controleer:
+Controleer automatische verlenging:
 
 ```bash
 systemctl status certbot.timer
@@ -168,7 +173,7 @@ systemctl status certbot.timer
 
 ---
 
-## 10. Controleren
+## 11. Controleren
 
 ```bash
 systemctl status garmin-training
@@ -180,35 +185,49 @@ curl -I https://jouwdomein.nl/
 
 ---
 
-## 11. Eerste Garmin-login per gebruiker
+## 12. Eerste Garmin-login per gebruiker
 
-pirate-garmin vereist een eenmalige browser-gebaseerde login per gebruiker om OAuth-tokens op te slaan.
-Na de eerste login werkt de app automatisch met de gecachete tokens.
+garmin-connect-mcp vereist een eenmalige browserlogin per gebruiker. Na de login worden
+cookies opgeslagen in `GARMIN_HOME_DIR/{user_id}/.garmin-connect-mcp/session.json`.
 
-Voer dit uit nadat een gebruiker zich in de app heeft geregistreerd en zijn Garmin-credentials heeft ingevuld. Zoek het database-ID van de gebruiker op:
+Zoek het database-ID van de gebruiker op:
 
 ```bash
 sudo -u postgres psql garmin_training -c "SELECT id, email FROM users;"
 ```
 
-Voer daarna de login uit als de `garmin`-serviceuser (vervang `<user_id>` en credentials):
+Voer de login uit (vervang `<user_id>`). Op een server zonder scherm:
 
 ```bash
-# Xvfb starten zodat Playwright een display heeft
+# Xvfb starten
 Xvfb :99 -screen 0 1280x720x24 &
 export DISPLAY=:99
 
-# Login uitvoeren
-su -s /bin/bash garmin -c \
-  "DISPLAY=:99 \
-   GARMIN_USERNAME=gebruiker@email.nl \
-   GARMIN_PASSWORD=garminwachtwoord \
-   /opt/garmin-training/venv/bin/pirate-garmin login \
-   --app-dir /opt/garmin-training/garmin-tokens/<user_id>"
+# Login uitvoeren — opent een browservenster
+HOME=/opt/garmin-training/garmin-home/<user_id> \
+  DISPLAY=:99 \
+  node /opt/garmin-connect-mcp/dist/index.js login
 ```
 
-Na succesvolle login worden de tokens opgeslagen in `/opt/garmin-training/garmin-tokens/<user_id>/`.
-Playwright is daarna niet meer nodig voor die gebruiker.
+Er opent een browservenster met Garmin Connect. Log in, wacht tot je de activiteiten ziet,
+en druk daarna op **Enter** in de terminal. De sessie wordt opgeslagen.
+
+Rechten instellen na de login:
+
+```bash
+chown -R garmin:garmin /opt/garmin-training/garmin-home/
+```
+
+> **Tip:** Heb je een eigen PC of Mac? Doe de login daar (geen Xvfb nodig) en kopieer
+> de sessie naar de server:
+>
+> ```bash
+> # Lokaal (vervang <user_id>)
+> HOME=./garmin-home/<user_id> node /opt/garmin-connect-mcp/dist/index.js login
+>
+> # Kopieer naar server
+> scp -r garmin-home/<user_id> user@server:/opt/garmin-training/garmin-home/
+> ```
 
 ---
 
@@ -236,28 +255,21 @@ systemctl restart garmin-training
 
 ## Problemen oplossen
 
-**Fout: `playwright._impl._errors.Error` of `Executable doesn't exist`**
+**Fout: `No saved session found` bij schema genereren**
 
-```bash
-/opt/garmin-training/venv/bin/playwright install chromium
-/opt/garmin-training/venv/bin/playwright install-deps chromium
-```
-
-**Fout: `AuthenticationError` bij schema genereren**
-
-De Garmin sessie-tokens zijn verlopen of nog niet aangemaakt. Voer stap 11 opnieuw uit voor de betreffende gebruiker.
+De Garmin-login is nog niet uitgevoerd voor deze gebruiker. Voer stap 12 uit.
 
 **Fout: `connection refused` op PostgreSQL**
 
 ```bash
 systemctl status postgresql
-# Als gestopt:
 systemctl start postgresql
 ```
 
-**Fout: `permission denied` op .env**
+**Fout: `permission denied` op .env of garmin-home**
 
 ```bash
 chown garmin:garmin /opt/garmin-training/.env
 chmod 600 /opt/garmin-training/.env
+chown -R garmin:garmin /opt/garmin-training/garmin-home/
 ```

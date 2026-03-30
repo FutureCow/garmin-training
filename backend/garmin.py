@@ -1,77 +1,48 @@
-from datetime import date
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
 
-from pirate_garmin.client import GarminClient
-from pirate_garmin.endpoints import render_endpoint, resolve_endpoint
+from mcp import ClientSession
+from mcp.client.stdio import stdio_client, StdioServerParameters
 
 from .config import settings
 
 
-def get_garmin_client(username: str, password: str, user_id: int) -> GarminClient:
+def session_exists(user_id: int) -> bool:
     """
-    Create a pirate-garmin client with per-user token storage.
-
-    Tokens are cached in GARMIN_TOKENS_DIR/{user_id}/ so each user has an
-    isolated session. First-time login requires Playwright (browser-based auth).
-    Subsequent calls reuse the cached tokens automatically.
+    Return True if a saved garmin-connect-mcp session file exists for this user.
+    The session is stored at GARMIN_HOME_DIR/{user_id}/.garmin-connect-mcp/session.json
     """
-    app_dir = Path(settings.garmin_tokens_dir) / str(user_id)
-    app_dir.mkdir(parents=True, exist_ok=True)
-    return GarminClient.create(username=username, password=password, app_dir=app_dir)
-
-
-async def fetch_training_data(client: GarminClient) -> dict[str, Any]:
-    """
-    Fetch all relevant training data from Garmin Connect.
-    Returns a dict with activities, training status, sleep and readiness.
-    Individual endpoint failures are captured as {"error": "..."} so a
-    single unavailable endpoint does not abort the whole fetch.
-    """
-    profile = await client.get_profile_bundle()
-    data: dict[str, Any] = {"display_name": profile.display_name}
-
-    async def _fetch(key: str, endpoint_key: str, host: str, query: dict) -> None:
-        try:
-            endpoint = resolve_endpoint(endpoint_key)
-            path, params = render_endpoint(
-                endpoint,
-                path_values={},
-                query_values=query,
-                profile=profile,
-            )
-            data[key] = await client.request_json(host, path, params)
-        except Exception as exc:
-            data[key] = {"error": str(exc)}
-
-    # Recent activities (last 100 — covers roughly 3–6 months for most runners)
-    await _fetch(
-        "activities",
-        "activities.search",
-        "connectapi",
-        {"start": "0", "limit": "100"},
+    session_file = (
+        Path(settings.garmin_home_dir)
+        / str(user_id)
+        / ".garmin-connect-mcp"
+        / "session.json"
     )
+    return session_file.exists()
 
-    # Training readiness score
-    await _fetch("training_readiness", "training_readiness", "connectapi", {})
 
-    # Training status: includes VO2max trend, training load, recovery time
-    await _fetch("training_status", "training_status", "connectapi", {})
+@asynccontextmanager
+async def garmin_mcp_session(user_id: int):
+    """
+    Async context manager that starts garmin-connect-mcp as a subprocess
+    with a per-user HOME directory and yields an active MCP ClientSession.
 
-    # Sleep data for today
-    await _fetch(
-        "sleep",
-        "sleep.daily",
-        "services",
-        {"date": date.today().isoformat()},
+    garmin-connect-mcp loads its session from $HOME/.garmin-connect-mcp/session.json,
+    so setting HOME to GARMIN_HOME_DIR/{user_id} gives each user an isolated session.
+
+    Usage:
+        async with garmin_mcp_session(user_id) as session:
+            tools = await session.list_tools()
+    """
+    user_home = str(Path(settings.garmin_home_dir) / str(user_id))
+
+    server_params = StdioServerParameters(
+        command="node",
+        args=[settings.garmin_mcp_path],
+        env={**os.environ, "HOME": user_home},
     )
-
-    # Daily wellness summary (resting HR, stress, body battery)
-    await _fetch(
-        "daily_summary",
-        "user_summary.daily",
-        "connectapi",
-        {"calendarDate": date.today().isoformat()},
-    )
-
-    return data
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            yield session

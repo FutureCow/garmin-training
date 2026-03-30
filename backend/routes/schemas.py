@@ -5,6 +5,7 @@ from sqlalchemy import select, update
 from ..database import get_db
 from ..models import User, UserPreferences, TrainingSchema
 from ..auth import get_current_user
+from ..garmin import session_exists
 from ..scheduler import generate_training_schedule
 from ..schemas import SchemaResponse
 
@@ -16,8 +17,8 @@ async def generate_schema(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if not current_user.garmin_credentials_encrypted:
-        raise HTTPException(status_code=400, detail="Geen Garmin-account gekoppeld")
+    if not session_exists(current_user.id):
+        raise HTTPException(status_code=400, detail="Geen actieve Garmin-sessie. Vraag de beheerder om de Garmin-login uit te voeren.")
 
     result = await db.execute(
         select(UserPreferences).where(UserPreferences.user_id == current_user.id)
@@ -38,11 +39,7 @@ async def generate_schema(
         "start_date": prefs.start_date,
     }
 
-    schema_data = await generate_training_schedule(
-        current_user.garmin_credentials_encrypted,
-        prefs_dict,
-        current_user.id,
-    )
+    schema_data = await generate_training_schedule(prefs_dict, current_user.id)
 
     # Deactivate previous active schemas
     await db.execute(

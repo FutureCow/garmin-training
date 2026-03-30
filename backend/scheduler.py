@@ -3,57 +3,90 @@ import re
 
 from anthropic import AsyncAnthropic
 
-from .auth import decrypt_garmin_credentials
 from .config import settings
-from .garmin import fetch_training_data, get_garmin_client
+from .garmin import garmin_mcp_session
 
 
 async def generate_training_schedule(
-    garmin_credentials_encrypted: str,
     preferences: dict,
     user_id: int,
 ) -> dict:
     """
-    Fetch Garmin training data via pirate-garmin, then call Claude to generate
-    a personalised training schedule and return it as a dict.
+    Spawn garmin-connect-mcp as an MCP subprocess for this user, call Claude
+    with the MCP tools active, and return the generated training schedule as a dict.
     """
-    garmin_username, garmin_password = decrypt_garmin_credentials(garmin_credentials_encrypted)
+    async with garmin_mcp_session(user_id) as session:
+        tools_response = await session.list_tools()
 
-    client = get_garmin_client(garmin_username, garmin_password, user_id)
-    garmin_data = await fetch_training_data(client)
+        anthropic_tools = [
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.inputSchema,
+            }
+            for tool in tools_response.tools
+        ]
 
-    system_prompt = _build_system_prompt(preferences, garmin_data)
-
-    anthropic_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-    response = await anthropic_client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=8192,
-        system=system_prompt,
-        messages=[
+        system_prompt = _build_system_prompt(preferences)
+        messages = [
             {
                 "role": "user",
                 "content": "Genereer een trainingsschema op basis van mijn Garmin-data en voorkeuren.",
             }
-        ],
-    )
+        ]
 
-    if response.stop_reason == "max_tokens":
-        raise ValueError("Claude overschreed max_tokens bij het genereren van het trainingsschema")
+        client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
-    for block in response.content:
-        if hasattr(block, "text"):
-            return _extract_json(block.text)
+        MAX_ITERATIONS = 20
+        iteration = 0
 
-    raise ValueError("Claude gaf geen tekstblok terug in de response")
+        while True:
+            iteration += 1
+            if iteration > MAX_ITERATIONS:
+                raise ValueError(f"Claude did not finish within {MAX_ITERATIONS} tool-use iterations")
+
+            response = await client.messages.create(
+                model="claude-opus-4-6",
+                max_tokens=8192,
+                system=system_prompt,
+                tools=anthropic_tools,
+                messages=messages,
+            )
+
+            if response.stop_reason == "max_tokens":
+                raise ValueError("Claude overschreed max_tokens bij het genereren van het trainingsschema")
+
+            if response.stop_reason == "end_turn":
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        return _extract_json(block.text)
+                raise ValueError("Claude gaf end_turn maar geen tekstblok terug")
+
+            messages.append({"role": "assistant", "content": response.content})
+
+            tool_results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    result = await session.call_tool(block.name, block.input)
+                    result_text = result.content[0].text if result.content else ""
+                    tool_results.append(
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": result_text,
+                        }
+                    )
+
+            if not tool_results:
+                raise ValueError("Claude stopte met tool_use maar gaf geen tool_use blokken terug")
+            messages.append({"role": "user", "content": tool_results})
 
 
-def _build_system_prompt(preferences: dict, garmin_data: dict) -> str:
+def _build_system_prompt(preferences: dict) -> str:
     days_str = ", ".join(preferences.get("active_days") or [])
     distance = preferences.get("goal_distance") or "10K"
     if distance == "custom":
         distance = f"{preferences.get('goal_distance_km', '?')} km"
-
-    garmin_context = json.dumps(garmin_data, ensure_ascii=False, indent=2)
 
     return f"""Je bent een professionele hardloopcoach. Maak een gepersonaliseerd trainingsschema.
 
@@ -67,16 +100,13 @@ TRAININGSVOORKEUREN VAN DE GEBRUIKER:
 - Aantal weken: {preferences.get("schema_weeks") or 12}
 - Startdatum: {preferences.get("start_date") or "zo snel mogelijk"}
 
-GARMIN-DATA VAN DE GEBRUIKER:
-{garmin_context}
-
 INSTRUCTIES:
-1. Analyseer de bovenstaande Garmin-data:
-   - Activiteiten van de afgelopen maanden (volume, tempo, afstand)
-   - VO2max trend en trainingsbelasting
-   - Hersteltijden en slaapkwaliteit
-   - Trainingsstatus en gereedheid
-2. Schat het huidige niveau in (wekelijks volume, gemiddeld tempo, VO2max).
+1. Gebruik de beschikbare Garmin tools om de trainingsdata op te halen:
+   - Activiteiten van de afgelopen 3-6 maanden
+   - VO2max trend
+   - Gemiddelde hartslagdata
+   - Hersteltijden en slaapdata
+2. Analyseer het huidige niveau (wekelijks volume, gemiddeld tempo, VO2max).
 3. Genereer een schema dat ALLEEN trainingen plaatst op de opgegeven actieve trainingsdagen.
 4. Elke trainingsdag krijgt een beschrijving die uitlegt WAAROM die training in het schema staat.
 5. Geef het schema terug als JSON in dit exacte formaat — geen andere tekst:

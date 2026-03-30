@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 
 
 MOCK_SCHEMA = {
@@ -19,11 +19,6 @@ MOCK_SCHEMA = {
 
 
 async def setup_user_with_prefs(client, auth_headers):
-    await client.put(
-        "/preferences/garmin-credentials",
-        json={"garmin_username": "u", "garmin_password": "p"},
-        headers=auth_headers,
-    )
     await client.put(
         "/preferences",
         json={
@@ -45,11 +40,12 @@ async def setup_user_with_prefs(client, auth_headers):
 async def test_generate_schema(client, auth_headers):
     await setup_user_with_prefs(client, auth_headers)
 
-    with patch(
-        "backend.routes.schemas.generate_training_schedule",
-        new_callable=AsyncMock,
-        return_value=MOCK_SCHEMA,
-    ):
+    with patch("backend.routes.schemas.session_exists", return_value=True), \
+         patch(
+             "backend.routes.schemas.generate_training_schedule",
+             new_callable=AsyncMock,
+             return_value=MOCK_SCHEMA,
+         ):
         resp = await client.post("/schemas/generate", headers=auth_headers)
 
     assert resp.status_code == 201
@@ -62,11 +58,12 @@ async def test_generate_schema(client, auth_headers):
 async def test_list_and_get_active_schema(client, auth_headers):
     await setup_user_with_prefs(client, auth_headers)
 
-    with patch(
-        "backend.routes.schemas.generate_training_schedule",
-        new_callable=AsyncMock,
-        return_value=MOCK_SCHEMA,
-    ):
+    with patch("backend.routes.schemas.session_exists", return_value=True), \
+         patch(
+             "backend.routes.schemas.generate_training_schedule",
+             new_callable=AsyncMock,
+             return_value=MOCK_SCHEMA,
+         ):
         await client.post("/schemas/generate", headers=auth_headers)
 
     list_resp = await client.get("/schemas", headers=auth_headers)
@@ -79,6 +76,7 @@ async def test_list_and_get_active_schema(client, auth_headers):
 
 
 @pytest.mark.asyncio
-async def test_generate_without_garmin_credentials(client, auth_headers):
-    resp = await client.post("/schemas/generate", headers=auth_headers)
+async def test_generate_without_garmin_session(client, auth_headers):
+    with patch("backend.routes.schemas.session_exists", return_value=False):
+        resp = await client.post("/schemas/generate", headers=auth_headers)
     assert resp.status_code == 400

@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 
 
 @pytest.mark.asyncio
@@ -31,17 +32,15 @@ async def test_set_and_get_preferences(client, auth_headers):
 
 
 @pytest.mark.asyncio
-async def test_garmin_credentials(client, auth_headers):
-    status_before = await client.get("/preferences/garmin-status", headers=auth_headers)
-    assert status_before.json()["connected"] is False
+async def test_garmin_session_status(client, auth_headers):
+    with patch("backend.routes.preferences.session_exists", return_value=False):
+        status_resp = await client.get("/preferences/garmin-status", headers=auth_headers)
+    assert status_resp.json()["connected"] is False
 
-    put_resp = await client.put(
-        "/preferences/garmin-credentials",
-        json={"garmin_username": "garmin@example.com", "garmin_password": "garminpass"},
-        headers=auth_headers,
-    )
-    assert put_resp.status_code == 200
-    assert put_resp.json()["connected"] is True
+    with patch("backend.routes.preferences.session_exists", return_value=True):
+        status_resp = await client.get("/preferences/garmin-status", headers=auth_headers)
+    assert status_resp.json()["connected"] is True
 
-    delete_resp = await client.delete("/preferences/garmin-credentials", headers=auth_headers)
+    with patch("backend.routes.preferences.session_exists", return_value=False):
+        delete_resp = await client.delete("/preferences/garmin-credentials", headers=auth_headers)
     assert delete_resp.json()["connected"] is False

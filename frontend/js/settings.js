@@ -1,5 +1,6 @@
 import { apiGet, apiPut, apiDelete, clearTokens, requireAuth } from "./api.js";
 
+
 requireAuth();
 
 const DAYS = ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"];
@@ -66,20 +67,10 @@ async function loadGarminStatus() {
   document.getElementById("remove-garmin").style.display = data.connected ? "inline-block" : "none";
 }
 
-// Save Garmin credentials
-document.getElementById("save-garmin").addEventListener("click", async () => {
-  const garmin_username = document.getElementById("garmin-username").value.trim();
-  const garmin_password = document.getElementById("garmin-password").value;
-  if (!garmin_username || !garmin_password) { showAlert("Vul beide velden in"); return; }
-  const resp = await apiPut("/preferences/garmin-credentials", { garmin_username, garmin_password });
-  if (resp && resp.ok) { showAlert("Garmin-account opgeslagen", "success"); loadGarminStatus(); }
-  else showAlert("Opslaan mislukt");
-});
-
-// Remove Garmin credentials
+// Remove Garmin session
 document.getElementById("remove-garmin").addEventListener("click", async () => {
   const resp = await apiDelete("/preferences/garmin-credentials");
-  if (resp && resp.ok) { showAlert("Garmin-account verwijderd", "success"); loadGarminStatus(); }
+  if (resp && resp.ok) { showAlert("Garmin-sessie verwijderd", "success"); loadGarminStatus(); }
 });
 
 // Load preferences

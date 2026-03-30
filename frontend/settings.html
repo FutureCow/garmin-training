@@ -28,16 +28,11 @@
       <p style="margin-bottom:1rem;font-size:.9rem;color:var(--gray-600);">
         Status: <span id="garmin-status"><span class="spinner"></span></span>
       </p>
-      <div class="form-group">
-        <label>Garmin gebruikersnaam (e-mail)</label>
-        <input type="email" id="garmin-username" />
-      </div>
-      <div class="form-group">
-        <label>Garmin wachtwoord</label>
-        <input type="password" id="garmin-password" />
-      </div>
-      <button class="btn btn-primary" id="save-garmin">Opslaan</button>
-      <button class="btn btn-danger" id="remove-garmin" style="margin-left:.5rem;display:none;">Verwijderen</button>
+      <p style="font-size:.9rem;color:var(--gray-600);margin-bottom:1rem;">
+        De Garmin-koppeling wordt door de beheerder ingesteld via een eenmalige browserlogin op de server.
+        Neem contact op als je Garmin-account nog niet verbonden is.
+      </p>
+      <button class="btn btn-danger" id="remove-garmin" style="display:none;">Sessie verwijderen</button>
     </div>
 
     <div class="card">
